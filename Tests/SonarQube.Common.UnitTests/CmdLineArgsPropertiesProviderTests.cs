@@ -60,8 +60,8 @@ namespace SonarQube.Common.UnitTests
             var logger = new TestLogger();
             IList<ArgumentInstance> args = new List<ArgumentInstance>();
 
-            var dummyDescriptor = new ArgumentDescriptor("dummy", new string[] { "dummy prefix" }, false, "dummy desc", true);
-            var dummyDescriptor2 = new ArgumentDescriptor("dummy2", new string[] { "dummy prefix 2" }, false, "dummy desc 2", true);
+            var dummyDescriptor = ArgumentDescriptor.Create(new string[] { "dummy prefix" }, "dummy desc", allowMultiple: true);
+            var dummyDescriptor2 = ArgumentDescriptor.Create(new string[] { "dummy prefix 2" }, "dummy desc 2", allowMultiple: true);
 
             args.Add(new ArgumentInstance(dummyDescriptor, "should be ignored"));
             args.Add(new ArgumentInstance(dummyDescriptor2, "should be ignored"));

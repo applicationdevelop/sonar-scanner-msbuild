@@ -30,12 +30,11 @@ namespace SonarQube.Common
     /// </summary>
     public class FilePropertyProvider : IAnalysisPropertyProvider
     {
-        private const string DescriptorId = "properties.file.argument";
         public const string DefaultFileName = "SonarQube.Analysis.xml";
         public const string Prefix = "/s:";
 
-        public static readonly ArgumentDescriptor Descriptor = new ArgumentDescriptor(DescriptorId, new string[] { Prefix },
-            false, Resources.CmdLine_ArgDescription_PropertiesFilePath, false);
+        public static readonly ArgumentDescriptor Descriptor = ArgumentDescriptor.Create(
+            new string[] { Prefix }, Resources.CmdLine_ArgDescription_PropertiesFilePath);
 
         private readonly bool isDefaultPropertiesFile;
 
@@ -66,8 +65,7 @@ namespace SonarQube.Common
 
             // If the path to a properties file was specified on the command line, use that.
             // Otherwise, look for a default properties file in the default directory.
-            var settingsFileArgExists = ArgumentInstance.TryGetArgumentValue(DescriptorId, commandLineArguments,
-                out string propertiesFilePath);
+            var settingsFileArgExists = Descriptor.TryGetArgumentValue(commandLineArguments, out string propertiesFilePath);
 
             if (ResolveFilePath(propertiesFilePath, defaultPropertiesFileDirectory, logger,
                 out AnalysisProperties locatedPropertiesFile))

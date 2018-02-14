@@ -29,11 +29,8 @@ namespace SonarQube.Common
     /// </summary>
     public class CmdLineArgPropertyProvider : IAnalysisPropertyProvider
     {
-        public const string DynamicPropertyArgumentId = "dynamic.property";
-
-        public static readonly ArgumentDescriptor Descriptor = new ArgumentDescriptor(
-            id: DynamicPropertyArgumentId, prefixes: new string[] { "/d:" }, required: false, allowMultiple: true,
-            description: Resources.CmdLine_ArgDescription_DynamicProperty);
+        public static readonly ArgumentDescriptor Descriptor = ArgumentDescriptor.Create(
+            new string[] { "/d:" }, Resources.CmdLine_ArgDescription_DynamicProperty, allowMultiple: true);
 
         private readonly IEnumerable<Property> properties;
 
@@ -119,7 +116,7 @@ namespace SonarQube.Common
 
             var validProperties = new List<Property>();
 
-            foreach (var argument in arguments.Where(a => a.Descriptor.Id == DynamicPropertyArgumentId))
+            foreach (var argument in arguments.Where(Descriptor.IsMatch))
             {
                 if (Property.TryParse(argument.Value, out Property property))
                 {

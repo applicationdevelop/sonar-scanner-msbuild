@@ -30,7 +30,8 @@ namespace SonarQube.Common.UnitTests
     [TestClass]
     public class FilePropertyProviderTests
     {
-        private static readonly ArgumentDescriptor DummyDescriptor = new ArgumentDescriptor("dummy", new string[] { "dummy predifx" }, false, "dummy desc", true);
+        private static readonly ArgumentDescriptor DummyDescriptor = ArgumentDescriptor.Create(
+            new string[] { "dummy predifx" }, "dummy desc", allowMultiple: true);
 
         public TestContext TestContext { get; set; }
 

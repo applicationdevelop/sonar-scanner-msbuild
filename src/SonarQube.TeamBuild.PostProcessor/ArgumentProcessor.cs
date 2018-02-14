@@ -33,8 +33,6 @@ namespace SonarQube.TeamBuild.PostProcessor
     /// </summary>
     public static class ArgumentProcessor
     {
-        #region Arguments definitions
-
         private static IList<ArgumentDescriptor> Descriptors;
 
         static ArgumentProcessor()
@@ -47,12 +45,8 @@ namespace SonarQube.TeamBuild.PostProcessor
             };
 
             Debug.Assert(Descriptors.All(d => d.Prefixes != null && d.Prefixes.Any()), "All descriptors must provide at least one prefix");
-            Debug.Assert(Descriptors.Select(d => d.Id).Distinct().Count() == Descriptors.Count, "All descriptors must have a unique id");
+            Debug.Assert(Descriptors.Distinct().Count() == Descriptors.Count, "All descriptors must be unique");
         }
-
-        #endregion Arguments definitions
-
-        #region Public methods
 
         /// <summary>
         /// Attempts to process the supplied command line arguments and
@@ -92,10 +86,6 @@ namespace SonarQube.TeamBuild.PostProcessor
             return provider != null;
         }
 
-        #endregion Public methods
-
-        #region Private methods
-
         /// <summary>
         /// Performs any additional validation on the parsed arguments and logs errors
         /// if necessary.
@@ -126,7 +116,5 @@ namespace SonarQube.TeamBuild.PostProcessor
             // will be stripped from the the pre-processor command line
             return ProcessRunnerArguments.SensitivePropertyKeys.Any(marker => Property.AreKeysEqual(marker, property.Id));
         }
-
-        #endregion Private methods
     }
 }

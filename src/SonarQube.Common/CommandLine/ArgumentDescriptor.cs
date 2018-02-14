@@ -19,14 +19,16 @@
  */
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
 namespace SonarQube.Common
 {
     /// <summary>
     /// Data class that describes a single valid command line argument - id, prefixes, multiplicity etc
     /// </summary>
-    [DebuggerDisplay("{Id}")]
+    [DebuggerDisplay("{Prefixes[0]}")]
     public class ArgumentDescriptor
     {
         // https://msdn.microsoft.com/en-us/library/ms973919.aspx
@@ -36,17 +38,13 @@ namespace SonarQube.Common
 
         public static readonly StringComparison IdComparison = StringComparison.Ordinal;
 
-        public ArgumentDescriptor(string id, string[] prefixes, bool required, string description, bool allowMultiple)
-            : this(id, prefixes, required, description, allowMultiple, false /* not a verb */)
+        private ArgumentDescriptor(string[] prefixes, bool required, string description, bool allowMultiple)
+            : this(prefixes, required, description, allowMultiple, false /* not a verb */)
         {
         }
 
-        public ArgumentDescriptor(string id, string[] prefixes, bool required, string description, bool allowMultiple, bool isVerb)
+        private ArgumentDescriptor(string[] prefixes, bool required, string description, bool allowMultiple, bool isVerb)
         {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                throw new ArgumentNullException("id");
-            }
             if (prefixes == null || prefixes.Length == 0)
             {
                 throw new ArgumentNullException("prefixes");
@@ -56,20 +54,12 @@ namespace SonarQube.Common
                 throw new ArgumentNullException("description");
             }
 
-            Id = id;
             Prefixes = prefixes;
             Required = required;
             Description = description;
             AllowMultiple = allowMultiple;
             IsVerb = isVerb;
         }
-
-        #region Properties
-
-        /// <summary>
-        /// The unique (internal) identifier for the argument
-        /// </summary>
-        public string Id { get; }
 
         /// <summary>
         /// Any prefixes supported for the argument. This should include all of the characters that
@@ -100,6 +90,22 @@ namespace SonarQube.Common
         /// </summary>
         public bool IsVerb { get; }
 
-        #endregion Properties
+        public bool IsMatch(ArgumentInstance argument) =>
+            Equals(argument.Descriptor);
+
+        public static ArgumentDescriptor Create(string[] prefixes, string description, bool required = false, bool allowMultiple = false) =>
+            new ArgumentDescriptor(prefixes, required, description, allowMultiple);
+
+        public static ArgumentDescriptor CreateVerb(string prefix, string description) =>
+            new ArgumentDescriptor(new[] { prefix }, required: false, description: description, allowMultiple: false, isVerb: true);
+
+        public bool Exists(IEnumerable<ArgumentInstance> arguments) =>
+            arguments.Any(IsMatch);
+
+        public bool TryGetArgumentValue(IEnumerable<ArgumentInstance> arguments, out string value)
+        {
+            value = arguments.FirstOrDefault(IsMatch)?.Value;
+            return value != null;
+        }
     }
 }

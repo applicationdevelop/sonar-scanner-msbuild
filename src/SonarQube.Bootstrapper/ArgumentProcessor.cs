@@ -39,12 +39,11 @@ namespace SonarQube.Bootstrapper
 
         #region Arguments definitions
 
-        private const string BeginId = "begin.id";
-        private const string EndId = "end.id";
-        public const string HelpId = "help.id";
+        private static ArgumentDescriptor BeginDescriptor = ArgumentDescriptor.CreateVerb(
+                "begin", Resources.CmdLine_ArgDescription_Begin);
 
-        public const string BeginVerb = "begin";
-        public const string EndVerb = "end";
+        private static ArgumentDescriptor EndDescriptor = ArgumentDescriptor.CreateVerb(
+                "end", Resources.CmdLine_ArgDescription_End);
 
         private static IList<ArgumentDescriptor> Descriptors;
 
@@ -54,18 +53,14 @@ namespace SonarQube.Bootstrapper
             // To add a new argument, just add it to the list.
             Descriptors = new List<ArgumentDescriptor>
             {
-                new ArgumentDescriptor(
-                id: BeginId, prefixes: new string[] { BeginVerb }, required: false, allowMultiple: false, description: Resources.CmdLine_ArgDescription_Begin, isVerb: true),
-
-                new ArgumentDescriptor(
-                id: EndId, prefixes: new string[] { EndVerb }, required: false, allowMultiple: false, description: Resources.CmdLine_ArgDescription_End, isVerb: true),
-
+                BeginDescriptor,
+                EndDescriptor,
                 FilePropertyProvider.Descriptor,
                 CmdLineArgPropertyProvider.Descriptor
             };
 
             Debug.Assert(Descriptors.All(d => d.Prefixes != null && d.Prefixes.Any()), "All descriptors must provide at least one prefix");
-            Debug.Assert(Descriptors.Select(d => d.Id).Distinct().Count() == Descriptors.Count, "All descriptors must have a unique id");
+            Debug.Assert(Descriptors.Distinct().Count() == Descriptors.Count, "All descriptors must have a unique id");
         }
 
         #endregion Arguments definitions
@@ -138,8 +133,8 @@ namespace SonarQube.Bootstrapper
         private static bool TryGetPhase(int originalArgCount, IEnumerable<ArgumentInstance> arguments, ILogger logger, out AnalysisPhase phase)
         {
             // The command line parser will already have checked for duplicates
-            var hasBeginVerb = ArgumentInstance.TryGetArgument(BeginId, arguments, out ArgumentInstance argumentInstance);
-            var hasEndVerb = ArgumentInstance.TryGetArgument(EndId, arguments, out argumentInstance);
+            var hasBeginVerb = BeginDescriptor.Exists(arguments);
+            var hasEndVerb = EndDescriptor.Exists(arguments);
 
             if (hasBeginVerb && hasEndVerb) // both
             {
@@ -201,12 +196,11 @@ namespace SonarQube.Bootstrapper
                 throw new ArgumentNullException("commandLineArgs");
             }
 
-            var excludedVerbs = new string[] { BeginVerb, EndVerb };
-            var excludedPrefixes = new string[] { };
+            var excludedVerbs = new [] { BeginDescriptor, EndDescriptor };
+            var excludedPrefixes = new HashSet<string>(excludedVerbs.SelectMany(v => v.Prefixes));
 
             return commandLineArgs
-                .Except(excludedVerbs)
-                .Where(arg => !excludedPrefixes.Any(e => arg.StartsWith(e, ArgumentDescriptor.IdComparison)))
+                .Where(arg => !excludedPrefixes.Any(e => arg.Equals(e, ArgumentDescriptor.IdComparison)))
                 .ToList();
         }
 

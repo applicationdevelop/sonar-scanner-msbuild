@@ -40,13 +40,12 @@ namespace SonarQube.Common.UnitTests
         }
 
         [TestMethod]
-        public void Parser_DuplicateDescriptorIds()
+        public void Parser_DuplicateDescriptors()
         {
-            var d1 = new ArgumentDescriptor("id1", new string[] { "a" }, true, "desc1", false);
-            var d2 = new ArgumentDescriptor("id1", new string[] { "b" }, true, "desc2", false);
+            var d1 = ArgumentDescriptor.Create(new string[] { "a" }, "desc1");
 
             AssertException.Expects<ArgumentException>(() => new CommandLineParser(
-                new ArgumentDescriptor[] { d1, d2 }, true));
+                new ArgumentDescriptor[] { d1, d1 }, true));
         }
 
         [TestMethod]
@@ -58,7 +57,7 @@ namespace SonarQube.Common.UnitTests
 
             var args = new string[] { "/a:XXX", "/unrecognized" };
 
-            var d1 = new ArgumentDescriptor("id1", new string[] { "/a:" }, true, "desc1", false);
+            var d1 = ArgumentDescriptor.Create(new string[] { "/a:" }, "desc1");
 
             // 1. Don't allow unrecognized
             parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, false);
@@ -73,7 +72,7 @@ namespace SonarQube.Common.UnitTests
             logger = new TestLogger();
             instances = CheckProcessingSucceeds(parser, logger, args);
 
-            AssertExpectedValue("id1", "XXX", instances);
+            AssertExpectedValue(d1, "XXX", instances);
             AssertExpectedInstancesCount(1, instances);
             logger.AssertMessagesLogged(0); // expecting unrecognized arguments to be ignored silently
         }
@@ -83,13 +82,13 @@ namespace SonarQube.Common.UnitTests
         {
             var args = new string[] { "aaa:all lowercase", "AAA:all uppercase", "aAa: mixed case" };
 
-            var d1 = new ArgumentDescriptor("id", new string[] { "AAA:" }, true/* allow multiples */ , "desc1", true /* allow multiple */);
-            var parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, true /* allow unrecognized */);
+            var d1 = ArgumentDescriptor.Create(new string[] { "AAA:" }, "desc1", allowMultiple: true);
+            var parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, allowUnrecognized: true);
 
             // Act
             var instances = CheckProcessingSucceeds(parser, new TestLogger(), args);
 
-            AssertExpectedValue("id", "all uppercase", instances);
+            AssertExpectedValue(d1, "all uppercase", instances);
             AssertExpectedInstancesCount(1, instances);
         }
 
@@ -103,7 +102,7 @@ namespace SonarQube.Common.UnitTests
             var args = new string[] { "zzzv1", "zzzv2", "zzzv3" };
 
             // 1. Don't allow multiples
-            var d1 = new ArgumentDescriptor("id", new string[] { "zzz" }, true, "desc1", false /* no multiples */);
+            var d1 = ArgumentDescriptor.Create(new string[] { "zzz" }, "desc1", allowMultiple: false);
             parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, false);
 
             logger = CheckProcessingFails(parser, args);
@@ -113,12 +112,12 @@ namespace SonarQube.Common.UnitTests
             logger.AssertErrorsLogged(2);
 
             // 2. Allow multiples
-            d1 = new ArgumentDescriptor("id", new string[] { "zzz" }, true, "desc1", true /* allow multiple */);
+            d1 = ArgumentDescriptor.Create(new string[] { "zzz" }, "desc1", allowMultiple: true);
             parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, true);
             logger = new TestLogger();
             instances = CheckProcessingSucceeds(parser, logger, args);
 
-            AssertExpectedValues("id", instances, "v1", "v2", "v3");
+            AssertExpectedValues(d1, instances, "v1", "v2", "v3");
             AssertExpectedInstancesCount(3, instances);
         }
 
@@ -129,10 +128,10 @@ namespace SonarQube.Common.UnitTests
             IEnumerable<ArgumentInstance> instances;
             TestLogger logger;
 
-            var args = new string[] {  };
+            var args = new string[] { };
 
             // 1. Argument is required
-            var d1 = new ArgumentDescriptor("id", new string[] { "AAA" }, true /* required */, "desc1", false /* no multiples */);
+            var d1 = ArgumentDescriptor.Create(new string[] { "AAA" }, "desc1", required: true);
             parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, false);
 
             logger = CheckProcessingFails(parser, args);
@@ -141,7 +140,7 @@ namespace SonarQube.Common.UnitTests
             logger.AssertErrorsLogged(1);
 
             // 2. Argument is not required
-            d1 = new ArgumentDescriptor("id", new string[] { "AAA" }, false /* not required */, "desc1", false /* no multiples */);
+            d1 = ArgumentDescriptor.Create(new string[] { "AAA" }, "desc1", required: false);
             parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, true);
             logger = new TestLogger();
             instances = CheckProcessingSucceeds(parser, logger, args);
@@ -157,13 +156,13 @@ namespace SonarQube.Common.UnitTests
             IEnumerable<ArgumentInstance> instances;
             TestLogger logger;
 
-            var verb1 = new ArgumentDescriptor("v1", new string[] { "begin" }, false /* not required */, "desc1", false /* no multiples */, true);
-            parser = new CommandLineParser(new ArgumentDescriptor[] { verb1 }, true /* allow unrecognised */);
+            var verb1 = ArgumentDescriptor.CreateVerb("begin", "desc1");
+            parser = new CommandLineParser(new ArgumentDescriptor[] { verb1 }, allowUnrecognized: true);
 
             // 1. Exact match -> matched
             logger = new TestLogger();
             instances = CheckProcessingSucceeds(parser, logger, "begin");
-            AssertExpectedValue("v1", "", instances);
+            AssertExpectedValue(verb1, "", instances);
             AssertExpectedInstancesCount(1, instances);
 
             // 2. Partial match -> not matched
@@ -176,72 +175,7 @@ namespace SonarQube.Common.UnitTests
             instances = CheckProcessingSucceeds(parser, logger, "beginX", "begin", "beginY");
             Assert.AreEqual(string.Empty, instances.First().Value, "Value for verb should be empty");
             AssertExpectedInstancesCount(1, instances);
-            AssertExpectedValue("v1", "", instances);
-        }
-
-        [TestMethod]
-        [TestCategory("Verbs")]
-        public void Parser_Verbs_Multiples()
-        {
-            CommandLineParser parser;
-            IEnumerable<ArgumentInstance> instances;
-            TestLogger logger;
-
-            var verb1 = new ArgumentDescriptor("v1", new string[] { "noMult" }, false /* required */, "noMult desc", false /* no multiples */, true);
-            var verb2 = new ArgumentDescriptor("v2", new string[] { "multOk" }, false /* required */, "multOk desc", true /* allow multiples */, true);
-
-            parser = new CommandLineParser(new ArgumentDescriptor[] { verb1, verb2 }, true /* allow unrecognised */ );
-
-            // 1. Allowed multiples
-            logger = new TestLogger();
-            instances = CheckProcessingSucceeds(parser, logger, "multOk", "multOk");
-            AssertExpectedInstancesCount(2, instances);
-
-            // 2. Disallowed multiples
-            logger = CheckProcessingFails(parser, new string[] { "noMult", "noMult" });
-            logger.AssertSingleErrorExists("noMult");
-            logger.AssertErrorsLogged(1);
-        }
-
-        [TestMethod]
-        [TestCategory("Verbs")]
-        public void Parser_Verbs_Required()
-        {
-            CommandLineParser parser;
-            IEnumerable<ArgumentInstance> instances;
-            TestLogger logger;
-
-            var emptyArgs = new string[] { };
-            var matchingPrefixArgs = new string[] { "AAAa" };
-
-            // 1a. Argument is required but is missing -> error
-            var d1 = new ArgumentDescriptor("id", new string[] { "AAA" }, true /* required */, "desc1", false /* no multiples */, true);
-            parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, false);
-            logger = CheckProcessingFails(parser, emptyArgs);
-
-            logger.AssertSingleErrorExists("desc1");
-            logger.AssertErrorsLogged(1);
-
-            // 1b. Argument is required but is only partial match -> missing -> error2
-            logger = CheckProcessingFails(parser, matchingPrefixArgs);
-
-            logger.AssertSingleErrorExists("desc1"); // missing arg
-            logger.AssertSingleErrorExists("AAAa"); // unrecognized since not exact match
-            logger.AssertErrorsLogged(2);
-
-            // 2a. Argument is not required, missing -> ok
-            d1 = new ArgumentDescriptor("id", new string[] { "AAA" }, false /* not required */, "desc1", false /* no multiples */, true);
-            parser = new CommandLineParser(new ArgumentDescriptor[] { d1 }, true);
-            logger = new TestLogger();
-            instances = CheckProcessingSucceeds(parser, logger, emptyArgs);
-
-            AssertExpectedInstancesCount(0, instances);
-
-            // 2b. Argument is not required, partial -> missing -> ok
-            logger = new TestLogger();
-            instances = CheckProcessingSucceeds(parser, logger, matchingPrefixArgs);
-
-            AssertExpectedInstancesCount(0, instances);
+            AssertExpectedValue(verb1, "", instances);
         }
 
         [TestMethod]
@@ -253,14 +187,14 @@ namespace SonarQube.Common.UnitTests
             IEnumerable<ArgumentInstance> instances;
             TestLogger logger;
 
-            var verb1 = new ArgumentDescriptor("v1", new string[] { "X" }, false /* not required */, "verb1 desc", false /* no multiples */, true);
-            var prefix1 = new ArgumentDescriptor("p1", new string[] { "XX" }, false /* not required */, "prefix1 desc", false /* no multiples */, false);
-            var verb2 = new ArgumentDescriptor("v2", new string[] { "XXX" }, false /* not required */, "verb2 desc", false /* no multiples */, true);
-            var prefix2 = new ArgumentDescriptor("p2", new string[] { "XXXX" }, false /* not required */, "prefix2 desc", false /* no multiples */, false);
+            var verb1 = ArgumentDescriptor.CreateVerb("X", "verb1 desc");
+            var prefix1 = ArgumentDescriptor.Create(new string[] { "XX" }, "prefix1 desc");
+            var verb2 = ArgumentDescriptor.CreateVerb("XXX", "verb2 desc");
+            var prefix2 = ArgumentDescriptor.Create(new string[] { "XXXX" }, "prefix2 desc");
 
             // NOTE: this test only works because the descriptors are supplied to parser ordered
             // by decreasing prefix length
-            parser = new CommandLineParser(new ArgumentDescriptor[] { prefix2, verb2, prefix1, verb1 }, true /* allow unrecognised */);
+            parser = new CommandLineParser(new ArgumentDescriptor[] { prefix2, verb2, prefix1, verb1 }, allowUnrecognized: true);
 
             // 1. Exact match -> matched
             logger = new TestLogger();
@@ -271,10 +205,10 @@ namespace SonarQube.Common.UnitTests
                 "XXXXB" // prefix 2 - has value B,
                 );
 
-            AssertExpectedValue("v1", "", instances);
-            AssertExpectedValue("p1", "AAA", instances);
-            AssertExpectedValue("v2", "", instances);
-            AssertExpectedValue("p2", "B", instances);
+            AssertExpectedValue(verb1, "", instances);
+            AssertExpectedValue(prefix1, "AAA", instances);
+            AssertExpectedValue(verb2, "", instances);
+            AssertExpectedValue(prefix2, "B", instances);
         }
 
         #endregion Tests
@@ -309,25 +243,25 @@ namespace SonarQube.Common.UnitTests
             Assert.AreEqual(expected, actual.Count(), "Unexpected number of arguments recognized");
         }
 
-        private static void AssertExpectedValue(string id, string expectedValue, IEnumerable<ArgumentInstance> actual)
+        private static void AssertExpectedValue(ArgumentDescriptor descriptor, string expectedValue, IEnumerable<ArgumentInstance> actual)
         {
-            var found = ArgumentInstance.TryGetArgument(id, actual, out ArgumentInstance actualInstance);
-            Assert.IsTrue(found, "Expected argument was not found. Id: {0}", id);
+            var found = descriptor.TryGetArgumentValue(actual, out string value);
+            Assert.IsTrue(found, "Expected argument was not found: {0}", descriptor);
             Assert.IsNotNull(actual);
 
-            Assert.AreEqual(expectedValue, actualInstance.Value, "Unexpected instance value. Id: {0}", id);
+            Assert.AreEqual(expectedValue, value, "Unexpected instance value: {0}", descriptor);
 
-            var actualValues = actual.Where(a => ArgumentDescriptor.IdComparer.Equals(a.Descriptor.Id, id)).Select(a => a.Value).ToArray();
-            Assert.AreEqual(1, actualValues.Length, "Not expecting to find multiple values. Id: {0}", id);
+            var actualValues = actual.Where(descriptor.IsMatch).Select(a => a.Value).ToArray();
+            Assert.AreEqual(1, actualValues.Length, "Not expecting to find multiple values of {0}", descriptor);
         }
 
-        private static void AssertExpectedValues(string id, IEnumerable<ArgumentInstance> actual, params string[] expectedValues)
+        private static void AssertExpectedValues(ArgumentDescriptor descriptor, IEnumerable<ArgumentInstance> actual, params string[] expectedValues)
         {
-            var actualValues = actual.Where(a => ArgumentDescriptor.IdComparer.Equals(a.Descriptor.Id, id)).Select(a => a.Value).ToArray();
+            var actualValues = actual.Where(descriptor.IsMatch).Select(a => a.Value).ToArray();
 
             CollectionAssert.AreEqual(expectedValues, actualValues);
         }
 
-            #endregion Checks
-        }
+        #endregion Checks
     }
+}

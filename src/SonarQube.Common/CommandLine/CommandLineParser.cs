@@ -59,7 +59,7 @@ namespace SonarQube.Common
                 throw new ArgumentNullException("descriptors");
             }
 
-            if (descriptors.Select(d => d.Id).Distinct(ArgumentDescriptor.IdComparer).Count() != descriptors.Count())
+            if (descriptors.Distinct().Count() != descriptors.Count())
             {
                 throw new ArgumentException(Resources.ERROR_Parser_UniqueDescriptorIds, "descriptors");
             }
@@ -92,11 +92,9 @@ namespace SonarQube.Common
             {
                 if (TryGetMatchingDescriptor(arg, out ArgumentDescriptor descriptor, out string prefix))
                 {
-                    var newId = descriptor.Id;
-
-                    if (!descriptor.AllowMultiple && IdExists(newId, recognized))
+                    if (!descriptor.AllowMultiple && descriptor.Exists(recognized))
                     {
-                        ArgumentInstance.TryGetArgumentValue(newId, recognized, out string existingValue);
+                        descriptor.TryGetArgumentValue(recognized, out string existingValue);
                         logger.LogError(Resources.ERROR_CmdLine_DuplicateArg, arg, existingValue);
                         parsedOk = false;
                     }
@@ -174,12 +172,6 @@ namespace SonarQube.Common
             return match;
         }
 
-        private static bool IdExists(string id, IEnumerable<ArgumentInstance> arguments)
-        {
-            var exists = ArgumentInstance.TryGetArgument(id, arguments, out ArgumentInstance existing);
-            return exists;
-        }
-
         /// <summary>
         /// Checks whether any required arguments are missing and logs error messages for them.
         /// </summary>
@@ -188,10 +180,8 @@ namespace SonarQube.Common
             var allExist = true;
             foreach (var desc in descriptors.Where(d => d.Required))
             {
-                ArgumentInstance.TryGetArgument(desc.Id, arguments, out ArgumentInstance argument);
-
-                var exists = argument != null && !string.IsNullOrWhiteSpace(argument.Value);
-                if (!exists)
+                if (!desc.TryGetArgumentValue(arguments, out var value) ||
+                    string.IsNullOrWhiteSpace(value))
                 {
                     logger.LogError(Resources.ERROR_CmdLine_MissingRequiredArgument, desc.Description);
                     allExist = false;

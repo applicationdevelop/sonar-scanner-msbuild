@@ -137,12 +137,12 @@ namespace SonarQube.Bootstrapper.Tests
 
             // 3. Multiple occurrences -> error
             logger = CheckProcessingFails(validUrl, "begin", "begin");
-            logger.AssertSingleErrorExists(ArgumentProcessor.BeginVerb);
+            logger.AssertSingleErrorExists("begin");
 
             // 4. Missing -> valid with warning
             logger = new TestLogger();
             settings = CheckProcessingSucceeds(logger, validUrl);
-            logger.AssertSingleWarningExists(ArgumentProcessor.BeginVerb);
+            logger.AssertSingleWarningExists("begin");
             AssertExpectedChildArguments(settings, validUrl);
 
             // 5. Incorrect case -> treated as unrecognised argument
@@ -150,7 +150,7 @@ namespace SonarQube.Bootstrapper.Tests
             logger = new TestLogger();
             settings = CheckProcessingSucceeds(logger, validUrl, "BEGIN"); // wrong case
             logger.AssertWarningsLogged(1);
-            logger.AssertSingleWarningExists(ArgumentProcessor.BeginVerb);
+            logger.AssertSingleWarningExists("begin");
             AssertExpectedChildArguments(settings, validUrl, "BEGIN");
         }
 
@@ -197,7 +197,7 @@ namespace SonarQube.Bootstrapper.Tests
 
             // 3. Multiple occurrences -> invalid
             logger = CheckProcessingFails(validUrl, "end", "end");
-            logger.AssertSingleErrorExists(ArgumentProcessor.EndVerb);
+            logger.AssertSingleErrorExists("end");
 
             // 4. Missing, no other arguments -> valid with warning
             logger = new TestLogger();

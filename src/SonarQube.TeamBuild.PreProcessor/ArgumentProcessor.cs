@@ -42,19 +42,20 @@ namespace SonarQube.TeamBuild.PreProcessor
         /// </remarks>
         private static readonly Regex ProjectKeyRegEx = new Regex(@"^[a-zA-Z0-9:\-_\.]*[a-zA-Z:\-_\.]+[a-zA-Z0-9:\-_\.]*$", RegexOptions.Compiled | RegexOptions.Singleline);
 
-        #region Argument definitions
+        private static ArgumentDescriptor ProjectKeyDescriptor = ArgumentDescriptor.Create(
+                new string[] { "/key:", "/k:" }, Resources.CmdLine_ArgDescription_ProjectKey, required: true);
 
-        /// <summary>
-        /// Ids for supported arguments
-        /// </summary>
-        private static class KeywordIds
-        {
-            public const string ProjectKey = "projectKey.id";
-            public const string ProjectName = "projectName.id";
-            public const string ProjectVersion = "projectVersion.id";
-            public const string Organization = "organization.id";
-            public const string InstallLoaderTargets = "installLoaderTargets.id";
-        }
+        private static ArgumentDescriptor ProjectNameDescriptor = ArgumentDescriptor.Create(
+                new string[] { "/name:", "/n:" }, Resources.CmdLine_ArgDescription_ProjectName);
+
+        private static ArgumentDescriptor ProjectVersionDescriptor = ArgumentDescriptor.Create(
+                new string[] { "/version:", "/v:" }, Resources.CmdLine_ArgDescription_ProjectVersion);
+
+        private static ArgumentDescriptor OrganizationDescriptor = ArgumentDescriptor.Create(
+                new string[] { "/organization:", "/o:" }, Resources.CmdLine_ArgDescription_Organization);
+
+        private static ArgumentDescriptor InstallDescriptor = ArgumentDescriptor.Create(
+                new string[] { "/install:" }, Resources.CmdLine_ArgDescription_InstallTargets);
 
         private static IList<ArgumentDescriptor> Descriptors;
 
@@ -64,37 +65,18 @@ namespace SonarQube.TeamBuild.PreProcessor
             // To add a new argument, just add it to the list.
             Descriptors = new List<ArgumentDescriptor>
             {
-                new ArgumentDescriptor(
-                id: KeywordIds.ProjectKey, prefixes: new string[] { "/key:", "/k:" }, required: true, allowMultiple: false,
-                description: Resources.CmdLine_ArgDescription_ProjectKey),
-
-                new ArgumentDescriptor(
-                id: KeywordIds.ProjectName, prefixes: new string[] { "/name:", "/n:" }, required: false, allowMultiple: false,
-                description: Resources.CmdLine_ArgDescription_ProjectName),
-
-                new ArgumentDescriptor(
-                id: KeywordIds.ProjectVersion, prefixes: new string[] { "/version:", "/v:" }, required: false,
-                allowMultiple: false, description: Resources.CmdLine_ArgDescription_ProjectVersion),
-
-                new ArgumentDescriptor(
-                id: KeywordIds.Organization, prefixes: new string[] { "/organization:", "/o:" }, required: false,
-                allowMultiple: false, description: Resources.CmdLine_ArgDescription_Organization),
-
-                new ArgumentDescriptor(
-                id: KeywordIds.InstallLoaderTargets, prefixes: new string[] { "/install:" }, required: false,
-                allowMultiple: false, description: Resources.CmdLine_ArgDescription_InstallTargets),
-
+                ProjectKeyDescriptor,
+                ProjectNameDescriptor,
+                ProjectVersionDescriptor,
+                OrganizationDescriptor,
+                InstallDescriptor,
                 FilePropertyProvider.Descriptor,
                 CmdLineArgPropertyProvider.Descriptor
             };
 
             Debug.Assert(Descriptors.All(d => d.Prefixes != null && d.Prefixes.Any()), "All descriptors must provide at least one prefix");
-            Debug.Assert(Descriptors.Select(d => d.Id).Distinct().Count() == Descriptors.Count, "All descriptors must have a unique id");
+            Debug.Assert(Descriptors.Distinct().Count() == Descriptors.Count, "All descriptors must be unique");
         }
-
-        #endregion Argument definitions
-
-        #region Public methods
 
         /// <summary>
         /// Attempts to process the supplied command line arguments and
@@ -111,23 +93,21 @@ namespace SonarQube.TeamBuild.PreProcessor
             ProcessedArgs processed = null;
 
             // This call will fail if there are duplicate, missing, or unrecognized arguments
-            var parser = new CommandLineParser(Descriptors, false /* don't allow unrecognized */);
+            var parser = new CommandLineParser(Descriptors, allowUnrecognized: false);
             var parsedOk = parser.ParseArguments(commandLineArgs, logger, out IEnumerable<ArgumentInstance> arguments);
 
             // Handle the /install: command line only argument
             parsedOk &= TryGetInstallTargetsEnabled(arguments, logger, out bool installLoaderTargets);
 
             // Handler for command line analysis properties
-            parsedOk &= CmdLineArgPropertyProvider.TryCreateProvider(arguments, logger,
-                out IAnalysisPropertyProvider cmdLineProperties);
+            parsedOk &= CmdLineArgPropertyProvider.TryCreateProvider(arguments, logger, out IAnalysisPropertyProvider cmdLineProperties);
 
             // Handler for scanner environment properties
             parsedOk &= EnvScannerPropertiesProvider.TryCreateProvider(logger, out IAnalysisPropertyProvider scannerEnvProperties);
 
             // Handler for property file
             var asmPath = Path.GetDirectoryName(typeof(ArgumentProcessor).Assembly.Location);
-            parsedOk &= FilePropertyProvider.TryCreateProvider(arguments, asmPath, logger,
-                out IAnalysisPropertyProvider globalFileProperties);
+            parsedOk &= FilePropertyProvider.TryCreateProvider(arguments, asmPath, logger, out IAnalysisPropertyProvider globalFileProperties);
 
             if (parsedOk)
             {
@@ -135,10 +115,10 @@ namespace SonarQube.TeamBuild.PreProcessor
                 Debug.Assert(globalFileProperties != null);
 
                 processed = new ProcessedArgs(
-                    GetArgumentValue(KeywordIds.ProjectKey, arguments),
-                    GetArgumentValue(KeywordIds.ProjectName, arguments),
-                    GetArgumentValue(KeywordIds.ProjectVersion, arguments),
-                    GetArgumentValue(KeywordIds.Organization, arguments),
+                    GetArgumentValue(ProjectKeyDescriptor, arguments),
+                    GetArgumentValue(ProjectNameDescriptor, arguments),
+                    GetArgumentValue(ProjectVersionDescriptor, arguments),
+                    GetArgumentValue(OrganizationDescriptor, arguments),
                     installLoaderTargets,
                     cmdLineProperties,
                     globalFileProperties,
@@ -153,13 +133,10 @@ namespace SonarQube.TeamBuild.PreProcessor
             return processed;
         }
 
-        #endregion Public methods
-
-        #region Private methods
-
-        private static string GetArgumentValue(string id, IEnumerable<ArgumentInstance> arguments)
+        private static string GetArgumentValue(ArgumentDescriptor descriptor, IEnumerable<ArgumentInstance> arguments)
         {
-            return arguments.Where(a => a.Descriptor.Id == id).Select(a => a.Value).SingleOrDefault();
+            descriptor.TryGetArgumentValue(arguments, out var value);
+            return value;
         }
 
         /// <summary>
@@ -183,15 +160,11 @@ namespace SonarQube.TeamBuild.PreProcessor
 
         private static bool TryGetInstallTargetsEnabled(IEnumerable<ArgumentInstance> arguments, ILogger logger, out bool installTargetsEnabled)
         {
-            var hasInstallTargetsVerb = ArgumentInstance.TryGetArgument(KeywordIds.InstallLoaderTargets, arguments, out ArgumentInstance argumentInstance);
-
-            if (hasInstallTargetsVerb)
+            if (InstallDescriptor.TryGetArgumentValue(arguments, out string value))
             {
-                var canParse = bool.TryParse(argumentInstance.Value, out installTargetsEnabled);
-
-                if (!canParse)
+                if (!bool.TryParse(value, out installTargetsEnabled))
                 {
-                    logger.LogError(Resources.ERROR_CmdLine_InvalidInstallTargetsValue, argumentInstance.Value);
+                    logger.LogError(Resources.ERROR_CmdLine_InvalidInstallTargetsValue, value);
                     return false;
                 }
             }
@@ -207,7 +180,5 @@ namespace SonarQube.TeamBuild.PreProcessor
         {
             return ProjectKeyRegEx.IsMatch(projectKey);
         }
-
-        #endregion Private methods
     }
 }
