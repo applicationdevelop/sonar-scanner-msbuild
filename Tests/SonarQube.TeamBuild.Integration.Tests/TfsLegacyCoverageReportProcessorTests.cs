@@ -62,10 +62,13 @@ namespace SonarQube.TeamBuild.Integration.Tests
             var settings = CreateValidSettings();
             var logger = new TestLogger();
 
-            var processor = new TfsLegacyCoverageReportProcessor(urlProvider, downloader, converter);
+            var processor = new CoverageReportProcessor(
+                converter,
+                new TfsLegacyCoverageReportLocator(urlProvider, downloader, logger),
+                logger);
 
             // Act
-            var initResult = processor.Initialise(context, settings, logger);
+            var initResult = processor.Initialise(context, settings);
 
             // Assert
             Assert.IsFalse(initResult, "Expecting false: processor should not have been initialised successfully");
@@ -90,10 +93,13 @@ namespace SonarQube.TeamBuild.Integration.Tests
             var settings = CreateValidSettings();
             var logger = new TestLogger();
 
-            var processor = new TfsLegacyCoverageReportProcessor(urlProvider, downloader, converter);
+            var processor = new CoverageReportProcessor(
+                converter,
+                new TfsLegacyCoverageReportLocator(urlProvider, downloader, logger),
+                logger);
 
             // Act
-            var initResult = processor.Initialise(context, settings, logger);
+            var initResult = processor.Initialise(context, settings);
             Assert.IsTrue(initResult, "Expecting true: processor should have been initialised successfully");
             var result = processor.ProcessCoverageReports();
 
@@ -120,10 +126,13 @@ namespace SonarQube.TeamBuild.Integration.Tests
             var settings = CreateValidSettings();
             var logger = new TestLogger();
 
-            var processor = new TfsLegacyCoverageReportProcessor(urlProvider, downloader, converter);
+            var processor = new CoverageReportProcessor(
+                converter,
+                new TfsLegacyCoverageReportLocator(urlProvider, downloader, logger),
+                logger);
 
             // Act
-            var initResult = processor.Initialise(context, settings, logger);
+            var initResult = processor.Initialise(context, settings);
             Assert.IsTrue(initResult, "Expecting true: processor should have been initialised successfully");
             var result = processor.ProcessCoverageReports();
 
@@ -149,10 +158,13 @@ namespace SonarQube.TeamBuild.Integration.Tests
             var settings = CreateValidSettings();
             var logger = new TestLogger();
 
-            var processor = new TfsLegacyCoverageReportProcessor(urlProvider, downloader, converter);
+            var processor = new CoverageReportProcessor(
+                converter,
+                new TfsLegacyCoverageReportLocator(urlProvider, downloader, logger),
+                logger);
 
             // Act
-            var initResult = processor.Initialise(context, settings, logger);
+            var initResult = processor.Initialise(context, settings);
             Assert.IsTrue(initResult, "Expecting true: processor should have been initialised successfully");
             var result = processor.ProcessCoverageReports();
 
@@ -183,10 +195,13 @@ namespace SonarQube.TeamBuild.Integration.Tests
 
             downloader.CreateFileOnDownloadRequest = true;
 
-            var processor = new TfsLegacyCoverageReportProcessor(urlProvider, downloader, converter);
+            var processor = new CoverageReportProcessor(
+                converter,
+                new TfsLegacyCoverageReportLocator(urlProvider, downloader, logger),
+                logger);
 
             // Act
-            var initResult = processor.Initialise(context, settings, logger);
+            var initResult = processor.Initialise(context, settings);
             Assert.IsTrue(initResult, "Expecting true: processor should have been initialised successfully");
             var result = processor.ProcessCoverageReports();
 
@@ -196,7 +211,7 @@ namespace SonarQube.TeamBuild.Integration.Tests
             converter.AssertExpectedNumberOfConversions(1);
 
             downloader.AssertExpectedUrlsRequested(ValidUrl2);
-            downloader.AssertExpectedTargetFileNamesSupplied(Path.Combine(context.SonarOutputDir, TfsLegacyCoverageReportProcessor.DownloadFileName));
+            downloader.AssertExpectedTargetFileNamesSupplied(Path.Combine(context.SonarOutputDir, TfsLegacyCoverageReportLocator.DownloadFileName));
             Assert.IsTrue(result, "Expecting true: happy path");
 
             logger.AssertWarningsLogged(0);
